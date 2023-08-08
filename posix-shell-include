@@ -20,10 +20,10 @@ cmd_resolve() {
 cmd_rewrite() {
 	AWK_SCRIPT="$(
 		cat <<EOF
-/# POSIX-shell-include: (.+)/i {
-    if (gsub("# POSIX-shell-include: ", "$opt_executable -r ") > 0) {
-        cmd=\$0
-        while ( ( cmd | getline result ) > 0 ) {
+tolower(\$0) ~ /# posix-shell-include: (.+)/ {
+    line=tolower(\$0)
+    if (gsub("# posix-shell-include: ", "$opt_executable -r ", line) > 0) {
+        while ( ( line | getline result ) > 0 ) {
             print result
         }
         close(cmd)

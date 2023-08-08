@@ -18,16 +18,23 @@ cmd_resolve() {
 }
 
 cmd_rewrite() {
-	awk '/# POSIX-shell-include: (.+)/i {
-    if (gsub("# POSIX-shell-include: ", "posix-shell-include-dev -r ") > 0) {
-        cmd=$0
+	AWK_SCRIPT="$(
+		cat <<EOF
+/# POSIX-shell-include: (.+)/i {
+    if (gsub("# POSIX-shell-include: ", "$opt_executable -r ") > 0) {
+        cmd=\$0
         while ( ( cmd | getline result ) > 0 ) {
             print result
         }
         close(cmd)
         next
     }
-    } { print }'
+}
+{ print }
+EOF
+	)"
+
+	awk "$AWK_SCRIPT"
 }
 
 get_current_commit_sha() {
@@ -41,6 +48,7 @@ get_current_commit_sha() {
 	done
 }
 
+opt_executable="$0"
 opt_cmd="cmd_rewrite"
 opt_arg1=""
 

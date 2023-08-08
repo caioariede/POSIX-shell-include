@@ -1,31 +1,33 @@
 #!/bin/sh
 
+cmd_resolve() {
+	snippet="$(printf "%s" "$1" | tr -d ' ')"
+	case "$snippet" in
+	*"@"*)
+		head="$(printf "%s" "$snippet" | cut -d@ -f2)"
+		snippet="$(printf "%s" "$snippet" | cut -d@ -f1)"
+		;;
+	*)
+		head="main"
+		;;
+	esac
+	commit="$(get_current_commit_sha "$head")"
+	name="$(basename "$snippet")"
+	echo "# POSIX-shell-include: $snippet@$commit"
+	curl --silent "https://raw.githubusercontent.com/caioariede/POSIX-shell-include/$commit/$snippet/$name.sh"
+}
+
 cmd_rewrite() {
-	IFS=''
-	while read -r line; do
-		case "$line" in
-		*"# posix-shell-include: "* | *"# POSIX-shell-include: "* | *"# POSIX-SHELL-INCLUDE: "*)
-			indent="$(printf "%s" "$line" | cut -d# -f1)"
-			snippet="$(printf "%s" "$line" | cut -d: -f2 | tr -d ' ')"
-			case "$snippet" in
-			*"@"*)
-				head="$(printf "%s" "$snippet" | cut -d@ -f2)"
-				snippet="$(printf "%s" "$snippet" | cut -d@ -f1)"
-				;;
-			*)
-				head="main"
-				;;
-			esac
-			commit="$(get_current_commit_sha "$head")"
-			name="$(basename "$snippet")"
-			echo "$indent# POSIX-shell-include: $snippet@$commit"
-			curl --silent "https://raw.githubusercontent.com/caioariede/POSIX-shell-include/$commit/$snippet/$name.sh" | sed "s/^/$indent/"
-			;;
-		*)
-			echo "$line"
-			;;
-		esac
-	done <"$1"
+	awk '/# POSIX-shell-include: (.+)/i {
+    if (gsub("# POSIX-shell-include: ", "posix-shell-include-dev -r ") > 0) {
+        cmd=$0
+        while ( ( cmd | getline result ) > 0 ) {
+            print result
+        }
+        close(cmd)
+        next
+    }
+    } { print }'
 }
 
 get_current_commit_sha() {
@@ -39,8 +41,8 @@ get_current_commit_sha() {
 	done
 }
 
-opt_inplace=0
-opt_file=""
+opt_cmd="cmd_rewrite"
+opt_arg1=""
 
 argc="$#"
 argi=0
@@ -50,18 +52,27 @@ while [ $argi -lt $argc ]; do
 	shift
 	case "$arg" in
 	-i)
-		opt_inplace=1
+		opt_cmd="cmd_rewrite_inplace"
+		;;
+	-r)
+		opt_cmd="cmd_resolve"
 		;;
 	*)
-		opt_file="$arg"
+		opt_arg1="$arg"
 		;;
 	esac
 done
 
-if [ $opt_inplace -eq 1 ]; then
+case "$opt_cmd" in
+cmd_resolve)
+	cmd_resolve "$opt_arg1"
+	;;
+cmd_rewrite)
+	cmd_rewrite <"$opt_arg1"
+	;;
+cmd_rewrite_inplace)
 	tmpfile="$(mktemp)"
-	cmd_rewrite "$opt_file" >"$tmpfile"
-	cat "$tmpfile" >"$opt_file"
-else
-	cmd_rewrite "$opt_file"
-fi
+	cmd_rewrite <"$opt_arg1" >"$tmpfile"
+	cat "$tmpfile" >"$opt_arg1"
+	;;
+esac

@@ -36,3 +36,9 @@ else
 	echo "wget is not installed"
 fi
 ```
+
+## Install
+
+```shell
+sh -c 'curl -fsSLo $1 https://raw.githubusercontent.com/caioariede/POSIX-shell-include/HEAD/posix-shell-include && chmod +x $1' -- /usr/local/bin/posix-shell-include
+```

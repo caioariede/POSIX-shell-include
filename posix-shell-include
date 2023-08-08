@@ -1,0 +1,67 @@
+#!/bin/sh
+
+cmd_rewrite() {
+	IFS=''
+	while read -r line; do
+		case "$line" in
+		*"# posix-shell-include: "* | *"# POSIX-shell-include: "* | *"# POSIX-SHELL-INCLUDE: "*)
+			indent="$(printf "%s" "$line" | cut -d# -f1)"
+			snippet="$(printf "%s" "$line" | cut -d: -f2 | tr -d ' ')"
+			case "$snippet" in
+			*"@"*)
+				head="$(printf "%s" "$snippet" | cut -d@ -f2)"
+				snippet="$(printf "%s" "$snippet" | cut -d@ -f1)"
+				;;
+			*)
+				head="main"
+				;;
+			esac
+			commit="$(get_current_commit_sha "$head")"
+			name="$(basename "$snippet")"
+			echo "$indent# POSIX-shell-include: $snippet@$commit"
+			curl --silent "https://raw.githubusercontent.com/caioariede/POSIX-shell-include/$commit/$snippet/$name.sh" | sed "s/^/$indent/"
+			;;
+		*)
+			echo "$line"
+			;;
+		esac
+	done <"$1"
+}
+
+get_current_commit_sha() {
+	curl --silent "https://api.github.com/repos/caioariede/POSIX-shell-include/commits/$1" | while read -r line; do
+		case "$line" in
+		*'"sha":'*)
+			printf "%s" "$line" | cut -d\" -f4
+			exit 0
+			;;
+		esac
+	done
+}
+
+opt_inplace=0
+opt_file=""
+
+argc="$#"
+argi=0
+while [ $argi -lt $argc ]; do
+	arg="$1"
+	argi=$((argi + 1))
+	shift
+	case "$arg" in
+	-i)
+		opt_inplace=1
+		;;
+	*)
+		opt_file="$arg"
+		;;
+	esac
+done
+
+if [ $opt_inplace -eq 1 ]; then
+	tmpfile="$(mktemp)"
+	cmd_rewrite "$opt_file" >"$tmpfile"
+	cat "$tmpfile" >"$opt_file"
+else
+	cmd_rewrite "$opt_file"
+fi
